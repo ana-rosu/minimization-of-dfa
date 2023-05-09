@@ -1,10 +1,10 @@
-# reading data of the complete dfa
-automata = open("complete-dfa.txt")
+# reading data of the complete dfa from the file
+automata = open("input-files/test1.txt")
 alphabet = [x for x in automata.readline().split()]
 nrStates = int(automata.readline())
 initialState = automata.readline().strip('\n')
 finalStates = [x for x in automata.readline().split()]
-# delta function - transition table
+# building delta function = transition table
 delta = {}
 line = automata.readline()
 while line:
@@ -43,9 +43,10 @@ if len(r) != nrStates:
     delta = new_delta
 
 # now we finally have our dfa with no unreachable states
-# in case that some states were removed => assigning an index for each state in order to complete the table correspondingly
+# assigning an index for each state in order to complete the table correspondingly
 find_state_from_index = {i: state for i, state in enumerate(delta)}
 find_index_of_state = {state: i for i, state in enumerate(delta)}
+
 # Myhill Nerode Theorem - Table filling method
 
 # Step 1
@@ -85,7 +86,7 @@ while marked:
                             break
                     except:
                         pass
-# In the end, the unmarked pairs give me the equivalent pairs
+# In the end, the unmarked pairs give me the equivalent states
 
 # print filled table
 # for i in range(1, nrStates):
@@ -94,7 +95,7 @@ while marked:
 # Step 4
 # Combine all unmarked pairs and make them a single state
 
-# components -> list of sets with remaining components in minimized dfa
+# components -> list of sets representing the remaining components in the minimized dfa
 components = []
 for i in range(1, nrStates):
     for j in range(i):
@@ -117,7 +118,7 @@ for i in range(len(components)):
         # index out of range because I remove the sets which were merged into another set, so components[i] might not exist anymore
         pass
 
-# adding the states which are not equivalent to any other state as a component
+# adding the states which are not equivalent to any other state because they form a component on their own in the minimized dfa
 components_flat = []
 nr = 0
 for comp in components:
@@ -151,31 +152,71 @@ for comp in components:
             finalComponents.append(comp)
             break
 
-minimized_delta = {}
-for i, comp in enumerate(components):
-    for letter in alphabet:
-        for state in comp:
-            if delta[state][letter] in comp:
-                if comp not in minimized_delta:
-                    minimized_delta[comp] = {letter: comp}
+def build_minimized_delta(components):
+    global alphabet, delta
+    minimized_delta = {}
+    for i, comp in enumerate(components):
+        for letter in alphabet:
+            for state in comp:
+                if delta[state][letter] in comp:
+                    if comp not in minimized_delta:
+                        minimized_delta[comp] = {letter: comp}
+                    else:
+                        minimized_delta[comp][letter] = comp
                 else:
-                    minimized_delta[comp][letter] = comp
-            else:
-                for j in range(len(components)):
-                    if delta[state][letter] in components[j]:
-                        if comp not in minimized_delta:
-                            minimized_delta[comp] = {letter: components[j]}
-                        else:
-                            minimized_delta[comp][letter] = components[j]
-# print(minimized_delta)
+                    for j in range(len(components)):
+                        if delta[state][letter] in components[j]:
+                            if comp not in minimized_delta:
+                                minimized_delta[comp] = {letter: components[j]}
+                            else:
+                                minimized_delta[comp][letter] = components[j]
+    return minimized_delta
 
+minimized_delta = build_minimized_delta(components)
 # Printing the minimized dfa
-print("The minimized DFA is: \n")
-print("States:", *components)
-print("Alphabet:", *alphabet)
-print("Initial state:", initialComponent)
-print("Final states:", *finalComponents)
-print("Transition table:")
-for comp in minimized_delta:
-    for letter in minimized_delta[comp]:
-        print(f"\t{comp} {minimized_delta[comp][letter]} {letter}")
+def print_minimized_dfa(components):
+    global alphabet, initialComponent, finalComponents, minimized_delta
+    print("The minimized DFA is: \n")
+    print("States:", *components)
+    print("Alphabet:", *alphabet)
+    print("Initial state:", initialComponent)
+    print("Final states:", *finalComponents)
+    print("Transition table:")
+    for comp in minimized_delta:
+        for letter in minimized_delta[comp]:
+            print(f"\t{comp} -> {letter} -> {minimized_delta[comp][letter]}")
+
+
+print("Do you want the minimized DFA to be complete? [0/1]: ")
+choice = int(input())
+
+if choice == 0:
+    # removing dead states -> states from which you can never reach a final state
+    componentsUpdated = []
+    for state in components:
+        deadState = True
+        reachableStates = [state]
+        #the while loop continues until newStates is equal to reachableStates, which means that no new states were added in the last iteration, so we found all the reachable states starting from the current state
+        while True:
+            next = []
+            for s in reachableStates:
+                for letter in alphabet:
+                    next.append(minimized_delta[s][letter])
+            newStates = list(set(next))
+            if newStates == reachableStates:
+                break
+            reachableStates = newStates
+        for rs in reachableStates:
+            if rs in finalComponents:
+                deadState = False
+        if not deadState:
+            componentsUpdated.append(state)
+
+    componentsUpdated = list(set(componentsUpdated))
+
+    minimized_delta = build_minimized_delta(componentsUpdated)
+    print_minimized_dfa(componentsUpdated)
+elif choice == 1:
+    print_minimized_dfa(components)
+else:
+    print("Invalid command")
